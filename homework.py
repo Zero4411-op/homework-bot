@@ -22,7 +22,8 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 RETRY_PERIOD = 600
-ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
+ENDPOINT = ('https://practicum.yandex.ru/'
+            'api/user_api/homework_statuses/')
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
 HOMEWORK_VERDICTS = {
@@ -33,31 +34,32 @@ HOMEWORK_VERDICTS = {
 
 
 def check_tokens():
-    """Проверка доступности переменных окружения."""
+    """Проверяет наличие всех необходимых токенов."""
     if not PRACTICUM_TOKEN:
-        logger.critical('Нет PRACTICUM_TOKEN')
+        logger.critical('Отсутствует PRACTICUM_TOKEN')
         return False
     if not TELEGRAM_TOKEN:
-        logger.critical('Нет TELEGRAM_TOKEN')
+        logger.critical('Отсутствует TELEGRAM_TOKEN')
         return False
     if not TELEGRAM_CHAT_ID:
-        logger.critical('Нет TELEGRAM_CHAT_ID')
+        logger.critical('Отсутствует TELEGRAM_CHAT_ID')
         return False
     return True
 
 
 def send_message(bot, message):
-    """Отправка сообщения в Telegram."""
+    """Отправляет сообщение в Telegram."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.debug(f'Отправлено: {message}')
         return True
-    except Exception:
+    except Exception as error:
+        logger.error(f'Ошибка отправки в Telegram: {error}')
         return False
 
 
 def get_api_answer(timestamp):
-    """Запрос к API Практикума."""
+    """Делает запрос к API Яндекс.Практикума."""
     try:
         response = requests.get(
             ENDPOINT,
@@ -70,11 +72,14 @@ def get_api_answer(timestamp):
         return response.json()
     except requests.RequestException as error:
         logger.error(f'Ошибка запроса: {error}')
+        return {'homeworks': [], 'current_date': timestamp}
+    except Exception as error:
+        logger.error(f'Неожиданная ошибка: {error}')
         raise
 
 
 def check_response(response):
-    """Проверка ответа API на соответствие документации."""
+    """Проверяет структуру ответа API."""
     if not isinstance(response, dict):
         logger.error('Ответ не словарь')
         raise TypeError('Ответ не словарь')
@@ -91,7 +96,7 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """Извлечение статуса домашней работы."""
+    """Извлекает статус домашней работы."""
     if 'homework_name' not in homework:
         logger.error('Нет ключа homework_name')
         raise KeyError('Нет ключа homework_name')
