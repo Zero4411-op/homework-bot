@@ -52,8 +52,7 @@ def send_message(bot, message):
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.debug(f'Отправлено: {message}')
         return True
-    except Exception as error:
-        logger.error(f'Ошибка отправки: {error}')
+    except Exception:
         return False
 
 
@@ -69,7 +68,7 @@ def get_api_answer(timestamp):
             logger.error(f'Код ответа: {response.status_code}')
             raise Exception(f'Код ответа: {response.status_code}')
         return response.json()
-    except Exception as error:
+    except requests.RequestException as error:
         logger.error(f'Ошибка запроса: {error}')
         raise
 
