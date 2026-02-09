@@ -38,7 +38,7 @@ HOMEWORK_VERDICTS = {
 
 
 class HomeworkAPIError(Exception):
-    """Кастомное исключение для ошибок API Яндекс.Практикума."""
+    """Кастомное исключение для ошибок API."""
 
 
 class SendMessageError(Exception):
@@ -72,7 +72,7 @@ def send_message(bot, message):
 
 
 def get_api_answer(timestamp):
-    """Делает запрос к API Яндекс.Практикума."""
+    """Делает запрос к API."""
     params = {'from_date': timestamp}
 
     try:
