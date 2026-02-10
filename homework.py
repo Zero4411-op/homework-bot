@@ -65,8 +65,8 @@ def send_message(bot, message):
     except (requests.RequestException,
             telebot.apihelper.ApiException) as error:
         raise SendMessageError(
-            f'Ошибка отправки в Telegram. '
-            f'Часть сообщения: "{message[:50]}...". '
+            f'Ошибка отправки в Telegram.'
+            f'Часть сообщения: "{message[:50]}...".'
             f'Причина: {error}'
         ) from error
 
@@ -86,15 +86,15 @@ def get_api_answer(timestamp):
         )
     except requests.RequestException as error:
         raise HomeworkAPIError(
-            f'Ошибка сети при запросе к API. '
-            f'Эндпоинт: {ENDPOINT}. '
+            f'Ошибка сети при запросе к API.'
+            f'Эндпоинт: {ENDPOINT}.'
             f'Причина: {error}'
         ) from error
 
     if response.status_code != HTTPStatus.OK:
         raise HomeworkAPIError(
-            f'Эндпоинт {ENDPOINT} недоступен. '
-            f'Код ответа: {response.status_code}. '
+            f'Эндпоинт {ENDPOINT} недоступен.'
+            f'Код ответа: {response.status_code}.'
             f'Текст ошибки: "{response.text[:200]}"'
         )
 
@@ -102,9 +102,9 @@ def get_api_answer(timestamp):
         return response.json()
     except ValueError as error:
         raise HomeworkAPIError(
-            f'Ошибка парсинга JSON от API. '
-            f'Код ответа: {response.status_code}. '
-            f'Текст ответа: "{response.text[:200]}". '
+            f'Ошибка парсинга JSON от API.'
+            f'Код ответа: {response.status_code}.'
+            f'Текст ответа: "{response.text[:200]}".'
             f'Причина: {error}'
         ) from error
 
@@ -114,8 +114,8 @@ def check_response(response):
     response_type = type(response).__name__
     if not isinstance(response, dict):
         raise TypeError(
-            f'Ответ API имеет некорректный тип. '
-            f'Ожидался dict, получен {response_type}. '
+            f'Ответ API имеет некорректный тип.'
+            f'Ожидался dict, получен {response_type}.'
             f'Содержимое: {str(response)[:200]}'
         )
 
@@ -130,14 +130,14 @@ def check_response(response):
     homeworks_type = type(homeworks).__name__
     if not isinstance(homeworks, list):
         raise TypeError(
-            f'Ключ "homeworks" имеет некорректный тип. '
-            f'Ожидался list, получен {homeworks_type}. '
+            f'Ключ "homeworks" имеет некорректный тип.'
+            f'Ожидался list, получен {homeworks_type}.'
             f'Значение: {str(homeworks)[:200]}'
         )
 
     if 'current_date' not in response:
         raise KeyError(
-            f'В ответе API отсутствует обязательный ключ "current_date". '
+            f'В ответе API отсутствует обязательный ключ "current_date".'
             f'Полученные ключи: {list(response.keys())}'
         )
 
@@ -148,13 +148,13 @@ def parse_status(homework):
     """Извлекает статус домашней работы."""
     if 'homework_name' not in homework:
         raise KeyError(
-            f'В данных домашней работы отсутствует ключ "homework_name". '
+            f'В данных домашней работы отсутствует ключ "homework_name".'
             f'Полученные ключи: {list(homework.keys())}'
         )
 
     if 'status' not in homework:
         raise KeyError(
-            f'В данных домашней работы отсутствует ключ "status". '
+            f'В данных домашней работы отсутствует ключ "status".'
             f'Полученные ключи: {list(homework.keys())}'
         )
 
@@ -163,8 +163,8 @@ def parse_status(homework):
 
     if status not in HOMEWORK_VERDICTS:
         raise ValueError(
-            f'Получен неизвестный статус домашней работы: "{status}". '
-            f'Название работы: "{homework_name}". '
+            f'Получен неизвестный статус домашней работы: "{status}".'
+            f'Название работы: "{homework_name}".'
             f'Допустимые статусы: {list(HOMEWORK_VERDICTS.keys())}'
         )
 
