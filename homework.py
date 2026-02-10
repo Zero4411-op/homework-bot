@@ -10,15 +10,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter(
-    '%(asctime)s [%(levelname)s] %(message)s'
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+
+logger = logging.getLogger(__name__)
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -64,11 +62,15 @@ def send_message(bot, message):
     """Отправляет сообщение в Telegram."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
-    except Exception as error:
-        raise SendMessageError(f'Ошибка отправки в Telegram: {error}')
+    except (requests.RequestException,
+            telebot.apihelper.ApiException) as error:
+        raise SendMessageError(
+            f'Ошибка отправки в Telegram. '
+            f'Часть сообщения: "{message[:50]}...". '
+            f'Причина: {error}'
+        ) from error
 
     logger.debug(f'Отправлено сообщение в Telegram: {message}')
-    return True
 
 
 def get_api_answer(timestamp):
@@ -79,42 +81,65 @@ def get_api_answer(timestamp):
         response = requests.get(
             ENDPOINT,
             headers=HEADERS,
-            params=params
+            params=params,
+            timeout=10
         )
     except requests.RequestException as error:
-        raise HomeworkAPIError(f'Ошибка при запросе к API: {error}')
+        raise HomeworkAPIError(
+            f'Ошибка сети при запросе к API. '
+            f'Эндпоинт: {ENDPOINT}. '
+            f'Причина: {error}'
+        ) from error
 
     if response.status_code != HTTPStatus.OK:
         raise HomeworkAPIError(
             f'Эндпоинт {ENDPOINT} недоступен. '
-            f'Код ответа: {response.status_code}.'
+            f'Код ответа: {response.status_code}. '
+            f'Текст ошибки: "{response.text[:200]}"'
         )
 
     try:
         return response.json()
     except ValueError as error:
-        raise HomeworkAPIError(f'Ошибка парсинга JSON: {error}')
+        raise HomeworkAPIError(
+            f'Ошибка парсинга JSON от API. '
+            f'Код ответа: {response.status_code}. '
+            f'Текст ответа: "{response.text[:200]}". '
+            f'Причина: {error}'
+        ) from error
 
 
 def check_response(response):
     """Проверяет структуру ответа API."""
+    response_type = type(response).__name__
     if not isinstance(response, dict):
         raise TypeError(
-            f'Ответ не словарь, получен тип: {type(response).__name__}'
+            f'Ответ API имеет некорректный тип. '
+            f'Ожидался dict, получен {response_type}. '
+            f'Содержимое: {str(response)[:200]}'
         )
 
     if 'homeworks' not in response:
-        raise KeyError('В ответе API отсутствует ключ "homeworks"')
+        raise KeyError(
+            f'В ответе API отсутствует обязательный ключ "homeworks". '
+            f'Полученные ключи: {list(response.keys())}'
+        )
 
     homeworks = response['homeworks']
 
+    homeworks_type = type(homeworks).__name__
     if not isinstance(homeworks, list):
         raise TypeError(
-            f'homeworks не список, получен тип: {type(homeworks).__name__}'
+            f'Ключ "homeworks" имеет некорректный тип. '
+            f'Ожидался list, получен {homeworks_type}. '
+            f'Значение: {str(homeworks)[:200]}'
         )
 
     if 'current_date' not in response:
-        raise KeyError('В ответе API отсутствует ключ "current_date"')
+        raise KeyError(
+            f'В ответе API отсутствует обязательный ключ "current_date". '
+            f'Полученные ключи: {list(response.keys())}'
+        )
 
     return homeworks
 
@@ -122,16 +147,26 @@ def check_response(response):
 def parse_status(homework):
     """Извлекает статус домашней работы."""
     if 'homework_name' not in homework:
-        raise KeyError('В ответе API отсутствует ключ "homework_name"')
+        raise KeyError(
+            f'В данных домашней работы отсутствует ключ "homework_name". '
+            f'Полученные ключи: {list(homework.keys())}'
+        )
 
     if 'status' not in homework:
-        raise KeyError('В ответе API отсутствует ключ "status"')
+        raise KeyError(
+            f'В данных домашней работы отсутствует ключ "status". '
+            f'Полученные ключи: {list(homework.keys())}'
+        )
 
     homework_name = homework['homework_name']
     status = homework['status']
 
     if status not in HOMEWORK_VERDICTS:
-        raise ValueError(f'Неизвестный статус работы: {status}')
+        raise ValueError(
+            f'Получен неизвестный статус домашней работы: "{status}". '
+            f'Название работы: "{homework_name}". '
+            f'Допустимые статусы: {list(HOMEWORK_VERDICTS.keys())}'
+        )
 
     verdict = HOMEWORK_VERDICTS[status]
 
@@ -148,8 +183,8 @@ def process_status_update(homeworks, bot, last_status, response):
     message = parse_status(homework)
 
     if message != last_status:
-        if send_message(bot, message):
-            return message, response.get('current_date')
+        send_message(bot, message)
+        return message, response.get('current_date')
 
     return last_status, None
 
@@ -162,9 +197,10 @@ def handle_errors(error, bot, last_error):
     if error_message != last_error:
         try:
             send_message(bot, error_message)
-            return error_message
         except SendMessageError:
+            logger.exception('Не удалось отправить сообщение об ошибке')
             return last_error
+        return error_message
 
     return last_error
 
@@ -194,7 +230,9 @@ def main():
             last_error = ''
 
         except SendMessageError as error:
-            logger.error(f'Ошибка отправки сообщения в Telegram: {error}')
+            logger.exception(
+                f'Ошибка отправки сообщения в Telegram: {error}'
+            )
 
         except Exception as error:
             last_error = handle_errors(error, bot, last_error)
